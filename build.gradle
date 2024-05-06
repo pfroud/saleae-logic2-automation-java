@@ -1,0 +1,45 @@
+plugins {
+    id 'java'
+    id 'com.google.protobuf' version '0.9.4'
+}
+
+group = 'xyz.froud'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    runtimeOnly 'io.grpc:grpc-netty-shaded:1.63.0'
+    implementation 'io.grpc:grpc-protobuf:1.63.0'
+    implementation 'io.grpc:grpc-stub:1.63.0'
+    compileOnly 'org.apache.tomcat:annotations-api:6.0.53' // necessary for Java 9+
+}
+
+// https://github.com/grpc/grpc-java/blob/master/README.md#generated-code
+// https://github.com/google/protobuf-gradle-plugin/blob/master/README.md#customizing-source-directories
+sourceSets {
+    main {
+        proto {
+            exclude 'src/main/proto'
+            srcDir 'logic2-automation/proto/saleae/grpc'
+        }
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:3.25.1"
+    }
+    plugins {
+        grpc {
+            artifact = 'io.grpc:protoc-gen-grpc-java:1.63.0'
+        }
+    }
+    generateProtoTasks {
+        all()*.plugins {
+            grpc {}
+        }
+    }
+}
