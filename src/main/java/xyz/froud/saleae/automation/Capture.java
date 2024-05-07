@@ -1,3 +1,5 @@
+package xyz.froud.saleae.automation;
+
 import saleae.AddAnalyzerReply;
 import saleae.AddAnalyzerRequest;
 import saleae.AddHighLevelAnalyzerReply;

@@ -1,3 +1,5 @@
+package xyz.froud.saleae.automation;
+
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import saleae.AppInfo;
@@ -248,7 +250,7 @@ public class Manager implements AutoCloseable {
     }
 
     /**
-     * Loads a .sal file. The returned Capture object will be fully loaded, wait_until_done not required.
+     * Loads a .sal file. The returned xyz.froud.saleae.automation.Capture object will be fully loaded, wait_until_done not required.
      */
     public Capture loadCapture(
             String filePath
