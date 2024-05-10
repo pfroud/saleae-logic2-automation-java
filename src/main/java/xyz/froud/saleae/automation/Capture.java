@@ -22,13 +22,15 @@ import saleae.SaveCaptureRequest;
 import saleae.StopCaptureRequest;
 import saleae.WaitCaptureRequest;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Represents
- *
- * Java port of <a href="https://github.com/saleae/logic2-automation/blob/develop/python/saleae/automation/capture.py">capture.py</a>.
+ * <p>
+ * Java port of <a
+ * href="https://github.com/saleae/logic2-automation/blob/develop/python/saleae/automation/capture.py">capture.py</a>.
  */
 public class Capture implements AutoCloseable {
 
@@ -49,37 +51,65 @@ public class Capture implements AutoCloseable {
     }
 
     /**
-     * @see #addAnalyzer
+     * Helper for {@link #addAnalyzer}
      */
-    public static AnalyzerSettingValue getAnalyzerSettingValue(String value) {
-        return AnalyzerSettingValue.newBuilder().setStringValue(value).build();
+    public static class AnalyzerSettings {
+
+        private final Map<String, AnalyzerSettingValue> MAP = new HashMap<>();
+
+        public AnalyzerSettings put(String key, String value) {
+            MAP.put(key, AnalyzerSettingValue.newBuilder().setStringValue(value).build());
+            return this;
+        }
+
+        public AnalyzerSettings put(String key, long value) {
+            MAP.put(key, AnalyzerSettingValue.newBuilder().setInt64Value(value).build());
+            return this;
+        }
+
+        public AnalyzerSettings put(String key, boolean value) {
+            MAP.put(key, AnalyzerSettingValue.newBuilder().setBoolValue(value).build());
+            return this;
+        }
+
+        public AnalyzerSettings put(String key, double value) {
+            MAP.put(key, AnalyzerSettingValue.newBuilder().setDoubleValue(value).build());
+            return this;
+        }
+
+        public Map<String, AnalyzerSettingValue> toGRPC() {
+            return MAP;
+        }
+
     }
 
     /**
-     * @see #addAnalyzer
+     * Helper for {@link #addHighLevelAnalyzer}
      */
-    public static AnalyzerSettingValue getAnalyzerSettingValue(long value) {
-        return AnalyzerSettingValue.newBuilder().setInt64Value(value).build();
-    }
+    public static class HighLevelAnalyzerSettings {
 
-    /**
-     * @see #addAnalyzer
-     */
-    public static AnalyzerSettingValue getAnalyzerSettingValue(boolean value) {
-        return AnalyzerSettingValue.newBuilder().setBoolValue(value).build();
-    }
+        private final Map<String, HighLevelAnalyzerSettingValue> MAP = new HashMap<>();
 
-    /**
-     * @see #addAnalyzer
-     */
-    public static AnalyzerSettingValue getAnalyzerSettingValue(double value) {
-        return AnalyzerSettingValue.newBuilder().setDoubleValue(value).build();
+        public HighLevelAnalyzerSettings getHighLevelAnalyzerSettingValue(String key, String value) {
+            MAP.put(key, HighLevelAnalyzerSettingValue.newBuilder().setStringValue(value).build());
+            return this;
+        }
+
+        public HighLevelAnalyzerSettings getHighLevelAnalyzerSettingValue(String key, double value) {
+            MAP.put(key, HighLevelAnalyzerSettingValue.newBuilder().setNumberValue(value).build());
+            return this;
+        }
+
+        public Map<String, HighLevelAnalyzerSettingValue> toGRPC() {
+            return MAP;
+        }
+
     }
 
     /**
      * @param name The name of the Analyzer, as shown in the Logic 2 application add analyzer list. This must match
      * exactly.
-     * @param label The user editable display string for the analyzer. This will be shown in the analyzer data table
+     * @param label The user-editable display string for the analyzer. This will be shown in the analyzer data table
      * export.
      * @param settings All settings for the analyzer. The keys and values here must exactly match the Analyzer settings
      * as shown in the UI.
@@ -87,36 +117,22 @@ public class Capture implements AutoCloseable {
     public AnalyzerHandle addAnalyzer(
             String name,
             String label,
-            Map<String, AnalyzerSettingValue> settings
+            AnalyzerSettings settings
     ) {
         final AddAnalyzerRequest request = AddAnalyzerRequest.newBuilder()
                 .setCaptureId(CAPTURE_ID)
                 .setAnalyzerName(name)
                 .setAnalyzerLabel(label)
-                .putAllSettings(settings)
+                .putAllSettings(settings.toGRPC())
                 .build();
         final AddAnalyzerReply reply = MANAGER.STUB.addAnalyzer(request);
         return new AnalyzerHandle(reply.getAnalyzerId());
     }
 
     /**
-     * @see #addHighLevelAnalyzer
-     */
-    public static HighLevelAnalyzerSettingValue getHighLevelAnalyzerSettingValue(String value) {
-        return HighLevelAnalyzerSettingValue.newBuilder().setStringValue(value).build();
-    }
-
-    /**
-     * @see #addHighLevelAnalyzer
-     */
-    public static HighLevelAnalyzerSettingValue getHighLevelAnalyzerSettingValue(double value) {
-        return HighLevelAnalyzerSettingValue.newBuilder().setNumberValue(value).build();
-    }
-
-    /**
      * @param extensionDirectory The directory of the extension that the HLA is in.
      * @param name The name of the HLA, as specified in the extension.json of the extension.
-     * @param label The user editable display string for the high level analyzer. This will be shown in the analyzer
+     * @param label The user-editable display string for the high level analyzer. This will be shown in the analyzer
      * data table export.
      * @param inputAnalyzer Handle to analyzer (added via {@link #addAnalyzer) to use as input to this HLA.
      * @param settings All settings for the analyzer. The keys and values here must match the HLA settings as shown in
@@ -127,7 +143,7 @@ public class Capture implements AutoCloseable {
             String name,
             String label,
             AnalyzerHandle inputAnalyzer,
-            Map<String, HighLevelAnalyzerSettingValue> settings
+            HighLevelAnalyzerSettings settings
     ) {
         final AddHighLevelAnalyzerRequest request = AddHighLevelAnalyzerRequest.newBuilder()
                 .setCaptureId(CAPTURE_ID)
@@ -135,7 +151,7 @@ public class Capture implements AutoCloseable {
                 .setHlaName(name)
                 .setHlaLabel(label)
                 .setInputAnalyzerId(inputAnalyzer.ANALYZER_ID)
-                .putAllSettings(settings)
+                .putAllSettings(settings.toGRPC())
                 .build();
         final AddHighLevelAnalyzerReply reply = MANAGER.STUB.addHighLevelAnalyzer(request);
         return new AnalyzerHandle(reply.getAnalyzerId());
@@ -238,6 +254,7 @@ public class Capture implements AutoCloseable {
      * Do not call wait() more than once.
      * <p>
      * wait() should never be called for loaded captures.
+     * Can't use the name {@code wait()} because it is already {@link java.lang.Object#wait}
      */
     public void waitForCaptureToEnd() {
         final WaitCaptureRequest request = WaitCaptureRequest.newBuilder()
@@ -312,30 +329,35 @@ public class Capture implements AutoCloseable {
     }
 
     /**
-     * @see #exportDataTableCsv
+     * Wrapper for {@link saleae.DataTableAnalyzerConfiguration}. Used in {@link #exportDataTableCsv}.
      */
-    public static DataTableAnalyzerConfiguration getDataTableAnalyzerConfiguration(
-            AnalyzerHandle analyzerHandle,
-            RadixType radix
-    ) {
-        return DataTableAnalyzerConfiguration.newBuilder()
-                .setAnalyzerId(analyzerHandle.ANALYZER_ID)
-                .setRadixType(radix)
-                .build();
+    public static class DataTableAnalyzerConfig {
+        AnalyzerHandle analyzerHandle;
+        RadixType radix;
+
+        DataTableAnalyzerConfiguration toGRPC() {
+            return DataTableAnalyzerConfiguration.newBuilder()
+                    .setAnalyzerId(analyzerHandle.ANALYZER_ID)
+                    .setRadixType(radix)
+                    .build();
+        }
     }
 
     /**
-     * @see #exportDataTableCsv
+     * Wrapper for {@link saleae.DataTableFilter}. Used in {@link #exportDataTableCsv}.
      */
-    public static DataTableFilter getDataTableFilter(
-            String query,
-            List<String> columns
-    ) {
-        return DataTableFilter.newBuilder()
-                .setQuery(query)
-                .addAllColumns(columns)
-                .build();
+    public static class DataTableFilterWrapper {
+        String query;
+        List<String> columns;
+
+        public DataTableFilter toGRPC() {
+            return DataTableFilter.newBuilder()
+                    .setQuery(query)
+                    .addAllColumns(columns)
+                    .build();
+        }
     }
+
 
     /**
      * @param filePath The specified output file, including extension, .csv.
@@ -344,19 +366,19 @@ public class Capture implements AutoCloseable {
      */
     public void exportDataTableCsv(
             String filePath,
-            List<DataTableAnalyzerConfiguration> analyzers,
+            List<DataTableAnalyzerConfig> analyzers,
             boolean timestampInISO8601Format,
             List<String> columns,
-            DataTableFilter filter
+            DataTableFilterWrapper filter
     ) {
 
         final ExportDataTableCsvRequest request = ExportDataTableCsvRequest.newBuilder()
                 .setCaptureId(CAPTURE_ID)
                 .setFilepath(filePath)
-                .addAllAnalyzers(analyzers)
+                .addAllAnalyzers(analyzers.stream().map(DataTableAnalyzerConfig::toGRPC).toList())
                 .setIso8601Timestamp(timestampInISO8601Format)
                 .addAllExportColumns(columns)
-                .setFilter(filter)
+                .setFilter(filter.toGRPC())
                 .build();
 
         //noinspection ResultOfMethodCallIgnored

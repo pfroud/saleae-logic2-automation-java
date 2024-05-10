@@ -26,6 +26,7 @@ import saleae.StartCaptureRequest;
 import saleae.ThisApiVersion;
 import saleae.TimedCaptureMode;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -41,16 +42,6 @@ public class Manager implements AutoCloseable {
     private final ManagedChannel CHANNEL;
 
     final ManagerBlockingStub STUB;
-
-    public static void main(String[] args) {
-        try (Manager manager = new Manager()) {
-
-            System.out.println(manager.getDevices(true));
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
 
     /**
      * Try to connect to a running instance of the Logic 2 software using the default host and port.
@@ -101,146 +92,194 @@ public class Manager implements AutoCloseable {
         return reply.getDevicesList();
     }
 
-    public static LogicChannels getLogicChannels(
-            List<Integer> digitalChannels,
-            List<Integer> analogChannels
-    ) {
-        return LogicChannels.newBuilder()
-                .addAllDigitalChannels(digitalChannels)
-                .addAllAnalogChannels(analogChannels)
-                .build();
-    }
 
     /**
-     * @param digitalThresholdVolts For Pro 8 and Pro 16, this can be one of: 1.2, 1.8, or 3.3. For other devices this
-     * is ignored.
+     * Wrapper for {@link saleae.LogicDeviceConfiguration}
      */
-    public static LogicDeviceConfiguration getLogicDeviceConfiguration(
-            LogicChannels channels,
-            int digitalSampleRate,
-            int analogSampleRate,
-            double digitalThresholdVolts,
-            List<GlitchFilterEntry> glitchFilters
-    ) {
-        return LogicDeviceConfiguration.newBuilder()
-                .setLogicChannels(channels)
-                .setDigitalSampleRate(digitalSampleRate)
-                .setAnalogSampleRate(analogSampleRate)
-                .setDigitalThresholdVolts(digitalThresholdVolts)
-                .addAllGlitchFilters(glitchFilters)
-                .build();
+    public static class DeviceConfig {
+        public List<Integer> digitalChannels = Collections.emptyList();
+        public List<Integer> analogChannels = Collections.emptyList();
+        public int digitalSampleRate;
+        public int analogSampleRate;
+
+        /**
+         * For Pro 8 and Pro 16, this can be one of: 1.2, 1.8, or 3.3. For other devices this is ignored.
+         */
+        public double digitalThresholdVolts;
+        public List<GlitchFilter> glitchFilters = Collections.emptyList();
+
+        private LogicDeviceConfiguration toGRPC() {
+            return LogicDeviceConfiguration.newBuilder()
+                    .setLogicChannels(
+                            LogicChannels.newBuilder()
+                                    .addAllAnalogChannels(analogChannels)
+                                    .addAllDigitalChannels(digitalChannels)
+                    )
+                    .setDigitalSampleRate(digitalSampleRate)
+                    .setAnalogSampleRate(analogSampleRate)
+                    .setDigitalThresholdVolts(digitalThresholdVolts)
+                    .addAllGlitchFilters(glitchFilters.stream().map(GlitchFilter::toGRPC).toList())
+                    .build();
+        }
+
     }
 
     /**
-     * When in manual capture mode, the capture must be manually stopped by calling {@link Capture#stop()}.
-     *
-     * @param bufferSizeMegabytes This is the maximum number of megabytes allowed for storing data during a capture. *
-     * When this limit is reached, the oldest data will be deleted until the total usage is under bufferSizeMegabytes.
-     * @param trimDataSeconds Number of seconds to keep after the capture ends. If greater than 0, only the latest
-     * `{@code trimDataSeconds} of the capture will be kept, otherwise the data will not be trimmed.
+     * Wrapper for {@link saleae.GlitchFilterEntry}
      */
-    public static CaptureConfiguration getCaptureConfigurationManual(
-            int bufferSizeMegabytes,
-            double trimDataSeconds
-    ) {
-        return CaptureConfiguration.newBuilder()
-                .setBufferSizeMegabytes(bufferSizeMegabytes)
-                .setManualCaptureMode(
-                        ManualCaptureMode.newBuilder()
-                                .setTrimDataSeconds(trimDataSeconds)
-                )
+    public static class GlitchFilter {
 
-                .build();
+        public int channelIndex;
+        public double pulseWidthSeconds;
+
+        private GlitchFilterEntry toGRPC() {
+            return GlitchFilterEntry.newBuilder()
+                    .setChannelIndex(channelIndex)
+                    .setPulseWidthSeconds(pulseWidthSeconds)
+                    .build();
+        }
+
     }
 
     /**
-     * When in timed capture mode, the capture will automatically stop after {@code durationSeconds}.
-     *
-     * @param bufferSizeMegabytes This is the maximum number of megabytes allowed for storing data during a capture. *
-     * When this limit is reached, the capture will be terminated.
-     * @param trimDataSeconds Number of seconds to keep after the capture ends. If greater than 0, only the latest
-     * `{@code trimDataSeconds} of the capture will be kept, otherwise the data will not be trimmed.
+     * Wrapper for {@link saleae.CaptureConfiguration}
      */
-    public static CaptureConfiguration getCaptureConfigurationTimed(
-            int bufferSizeMegabytes,
-            double durationSeconds,
-            double trimDataSeconds
-    ) {
-        return CaptureConfiguration.newBuilder()
-                .setBufferSizeMegabytes(bufferSizeMegabytes)
-                .setTimedCaptureMode(
-                        TimedCaptureMode.newBuilder()
-                                .setDurationSeconds(durationSeconds)
-                                .setTrimDataSeconds(trimDataSeconds)
-                )
-                .build();
+    public static abstract class CaptureConfig {
+        /**
+         * The maximum number of megabytes allowed for storing data during a capture. When this limit is reached, what
+         * happens depends on the capture mode:
+         * <ul>
+         * <li>Manual - the oldest data will be deleted until the total usage is under bufferSizeMegabytes.</li>
+         * <li>Timer and digital trigger - the capture will be terminated.</li>
+         * <ul>
+         */
+        public int bufferSizeMegabytes;
+
+        /**
+         * Number of seconds to keep after the capture ends. If greater than 0, only the latest `{@code trimDataSeconds}
+         * of the capture will be kept, otherwise the data will not be trimmed.
+         */
+        double trimDataSeconds;
+
+        abstract CaptureConfiguration toGRPC();
     }
 
     /**
-     * @see #getCaptureConfigurationDigitalTrigger
+     * Wrapper for {@link saleae.CaptureConfiguration} with {@link saleae.ManualCaptureMode}
      */
-    public static DigitalTriggerLinkedChannel getDigitalTriggerLinkedChannel(
-            int channelIndex,
-            DigitalTriggerLinkedChannelState state
-    ) {
-        return DigitalTriggerLinkedChannel.newBuilder()
-                .setChannelIndex(channelIndex)
-                .setState(state)
-                .build();
+    public static class CaptureConfigManual extends CaptureConfig {
+
+        @Override
+        CaptureConfiguration toGRPC() {
+            return CaptureConfiguration.newBuilder()
+                    .setBufferSizeMegabytes(bufferSizeMegabytes)
+                    .setManualCaptureMode(
+                            ManualCaptureMode.newBuilder()
+                                    .setTrimDataSeconds(trimDataSeconds)
+                    )
+
+                    .build();
+        }
     }
 
     /**
+     * Wrapper for {@link saleae.CaptureConfiguration} with {@link saleae.TimedCaptureMode}
+     */
+    public static class CaptureConfigTimed extends CaptureConfig {
+
+        public double durationSeconds;
+
+        @Override
+        CaptureConfiguration toGRPC() {
+            return CaptureConfiguration.newBuilder()
+                    .setBufferSizeMegabytes(bufferSizeMegabytes)
+                    .setTimedCaptureMode(
+                            TimedCaptureMode.newBuilder()
+                                    .setDurationSeconds(durationSeconds)
+                                    .setTrimDataSeconds(trimDataSeconds)
+                    )
+
+                    .build();
+        }
+    }
+
+    /**
+     * Wrapper for {@link saleae.CaptureConfiguration} with {@link saleae.DigitalTriggerCaptureMode}
+     * <p>
      * When in digital trigger capture mode, the capture will automatically stop when the specified digital condition
      * has been met.
-     *
-     * @param bufferSizeMegabytes This is the maximum number of megabytes allowed for storing data during a capture.
-     * When this limit is reached, the capture will be terminated.
-     * @param afterTriggerSeconds Number of seconds to continue capturing after trigger
-     * @param trimDataSeconds Number of seconds to keep after the capture ends. If greater than 0, only the latest
-     * `{@code trimDataSeconds} of the capture will be kept, otherwise the data will not be trimmed.
-     * @param triggerChannelIndex index of channel in which to search for the trigger
-     * @param minPulseWidthSeconds Minimum pulse width to trigger on. Only applies when digitalTriggerType is a pulse
-     * trigger type.
-     * @param maxPulseWidthSeconds Maximum pulse width to trigger on. Only applies when digitalTriggerType is a pulse
-     * trigger type.
-     * @param linkedChannels Conditions on other digital channels that must be met in order to meet the trigger
-     * condition. For an edge trigger, the linked channel must be in the specified state at when the trigger edge
-     * occurs. For a pulse trigger, the linked channel must be in the specified state for the duration of the pulse.
      */
-    public static CaptureConfiguration getCaptureConfigurationDigitalTrigger(
-            int bufferSizeMegabytes,
-            DigitalTriggerType digitalTriggerType,
-            double afterTriggerSeconds,
-            double trimDataSeconds,
-            int triggerChannelIndex,
-            double minPulseWidthSeconds,
-            double maxPulseWidthSeconds,
-            List<DigitalTriggerLinkedChannel> linkedChannels
-    ) {
-        return CaptureConfiguration.newBuilder()
-                .setBufferSizeMegabytes(bufferSizeMegabytes)
-                .setDigitalCaptureMode(
-                        DigitalTriggerCaptureMode.newBuilder()
-                                .setTriggerType(digitalTriggerType)
-                                .setAfterTriggerSeconds(afterTriggerSeconds)
-                                .setTrimDataSeconds(trimDataSeconds)
-                                .setTriggerChannelIndex(triggerChannelIndex)
-                                .setMinPulseWidthSeconds(minPulseWidthSeconds)
-                                .setMaxPulseWidthSeconds(maxPulseWidthSeconds)
-                                .addAllLinkedChannels(linkedChannels)
-                )
-                .build();
+    public static class CaptureConfigDigitalTrigger extends CaptureConfig {
+
+        public DigitalTriggerType digitalTriggerType;
+        public double afterTriggerSeconds;
+        /**
+         * index of channel in which to search for the trigger
+         */
+        public int triggerChannelIndex;
+        /**
+         * Minimum pulse width to trigger on. Only applies when digitalTriggerType is a * pulse trigger type.
+         */
+        public double minPulseWidthSeconds;
+        /**
+         * Maximum pulse width to trigger on. Only applies when digitalTriggerType is a * pulse trigger type.
+         */
+        public double maxPulseWidthSeconds;
+
+        /**
+         * Conditions on other digital channels that must be met in order to meet the trigger condition. For an edge
+         * trigger, the linked channel must be in the specified state at when the trigger edge occurs. For a pulse
+         * trigger, the linked channel must be in the specified state for the duration of the pulse.
+         */
+        public List<LinkedChannel> linkedChannels = Collections.emptyList();
+
+        /**
+         * Wrapper for {@link saleae.DigitalTriggerLinkedChannel}
+         */
+        public static class LinkedChannel {
+            int channelIndex;
+            DigitalTriggerLinkedChannelState state;
+
+            DigitalTriggerLinkedChannel toGRPC() {
+                return DigitalTriggerLinkedChannel.newBuilder()
+                        .setChannelIndex(channelIndex)
+                        .setState(state)
+                        .build();
+            }
+
+        }
+
+        @Override
+        CaptureConfiguration toGRPC() {
+            return CaptureConfiguration.newBuilder()
+                    .setBufferSizeMegabytes(bufferSizeMegabytes)
+                    .setDigitalCaptureMode(
+                            DigitalTriggerCaptureMode.newBuilder()
+                                    .setTriggerType(digitalTriggerType)
+                                    .setAfterTriggerSeconds(afterTriggerSeconds)
+                                    .setTrimDataSeconds(trimDataSeconds)
+                                    .setTriggerChannelIndex(triggerChannelIndex)
+                                    .setMinPulseWidthSeconds(minPulseWidthSeconds)
+                                    .setMaxPulseWidthSeconds(maxPulseWidthSeconds)
+                                    .addAllLinkedChannels(
+                                            linkedChannels.stream().map(LinkedChannel::toGRPC).toList()
+                                    )
+                    )
+                    .build();
+        }
+
     }
+
 
     /**
      * The existing software settings, like selected device or added analyzers, are ignored.
      */
-    public Capture startCapture(String deviceID, LogicDeviceConfiguration logicDeviceConfiguration, CaptureConfiguration captureConfiguration) {
+    public Capture startCapture(String deviceID, Manager.DeviceConfig deviceConfig, CaptureConfig captureConfig) {
 
         final StartCaptureRequest request = StartCaptureRequest.newBuilder()
                 .setDeviceId(deviceID)
-                .setLogicDeviceConfiguration(logicDeviceConfiguration)
-                .setCaptureConfiguration(captureConfiguration)
+                .setLogicDeviceConfiguration(deviceConfig.toGRPC())
+                .setCaptureConfiguration(captureConfig.toGRPC())
                 .build();
 
         final StartCaptureReply reply = STUB.startCapture(request);
@@ -250,7 +289,7 @@ public class Manager implements AutoCloseable {
     }
 
     /**
-     * Loads a .sal file. The returned xyz.froud.saleae.automation.Capture object will be fully loaded, wait_until_done not required.
+     * Loads a .sal file. The returned Capture object will be fully loaded, you do not need to call wait_until_done.
      */
     public Capture loadCapture(
             String filePath
