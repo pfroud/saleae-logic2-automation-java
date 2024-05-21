@@ -97,15 +97,41 @@ public class Manager implements AutoCloseable {
      * Wrapper for {@link saleae.LogicDeviceConfiguration}
      */
     public static class DeviceConfig {
+        /**
+         * Indexes of digital channels to record.
+         */
         public List<Integer> digitalChannels = Collections.emptyList();
+
+        /**
+         * Indexes of analog channels to record.
+         */
         public List<Integer> analogChannels = Collections.emptyList();
+
+        /**
+         * In samples per second
+         */
         public int digitalSampleRate;
+
+        /**
+         * In samples per second
+         */
         public int analogSampleRate;
 
         /**
          * For Pro 8 and Pro 16, this can be one of: 1.2, 1.8, or 3.3. For other devices this is ignored.
          */
         public double digitalThresholdVolts;
+
+        /**
+         * Glitch filters can suppress short digital pulses to help remove noise picked up in a digital recording.
+         * <p>
+         * The glitch filter is purely a software filter on top of the recorded data. Using the glitch filter does not
+         * actually change the data that is recorded. Instead, it sits between the recorded data set and all software
+         * components that access it.
+         *
+         * @see <a
+         * href="https://support.saleae.com/user-guide/using-logic/software-glitch-filter">https://support.saleae.com/user-guide/using-logic/software-glitch-filter</a>
+         */
         public List<GlitchFilter> glitchFilters = Collections.emptyList();
 
         private LogicDeviceConfiguration toGRPC() {
@@ -125,7 +151,16 @@ public class Manager implements AutoCloseable {
     }
 
     /**
-     * Wrapper for {@link saleae.GlitchFilterEntry}
+     * Wrapper for {@link saleae.GlitchFilterEntry}.
+     * <p>
+     * Glitch filters can suppress short digital pulses to help remove noise picked up in a digital recording.
+     * <p>
+     * The glitch filter is purely a software filter on top of the recorded data. Using the glitch filter does not
+     * actually change the data that is recorded. Instead, it sits between the recorded data set and all software
+     * components that access it.
+     *
+     * @see <a
+     * href="https://support.saleae.com/user-guide/using-logic/software-glitch-filter">https://support.saleae.com/user-guide/using-logic/software-glitch-filter</a>
      */
     public static class GlitchFilter {
 
@@ -146,18 +181,22 @@ public class Manager implements AutoCloseable {
      */
     public static abstract class CaptureConfig {
         /**
-         * The maximum number of megabytes allowed for storing data during a capture. When this limit is reached, what
-         * happens depends on the capture mode:
+         * The maximum number of megabytes allowed for storing data during a capture.
+         * <p>
+         * When this limit is reached, what happens depends on the capture mode:
          * <ul>
-         * <li>Manual - the oldest data will be deleted until the total usage is under bufferSizeMegabytes.</li>
-         * <li>Timer and digital trigger - the capture will be terminated.</li>
+         * <li>In manual capture mode, the oldest data will be deleted until the total usage is under the limit.</li>
+         * <li>In timer and digitalTrigger capture modes, the capture will be terminated.</li>
          * <ul>
          */
         public int bufferSizeMegabytes;
 
         /**
-         * Number of seconds to keep after the capture ends. If greater than 0, only the latest `{@code trimDataSeconds}
-         * of the capture will be kept, otherwise the data will not be trimmed.
+         * Number of seconds to keep after the capture ends.
+         * <ul>
+         *     <li>If set to zero or a negative number, the data will not be trimmed.</li>
+         *     <li>If set to a positive number, only the latest this many seconds of the capture will be kept.</li>
+         * </ul>
          */
         double trimDataSeconds;
 
@@ -165,7 +204,9 @@ public class Manager implements AutoCloseable {
     }
 
     /**
-     * Wrapper for {@link saleae.CaptureConfiguration} with {@link saleae.ManualCaptureMode}
+     * Wrapper for {@link saleae.CaptureConfiguration} with {@link saleae.ManualCaptureMode}.
+     * <p>
+     * When in manual capture mode, the capture must be manually stopped using the StopCapture request.
      */
     public static class CaptureConfigManual extends CaptureConfig {
 
@@ -183,10 +224,14 @@ public class Manager implements AutoCloseable {
     }
 
     /**
-     * Wrapper for {@link saleae.CaptureConfiguration} with {@link saleae.TimedCaptureMode}
+     * Wrapper for {@link saleae.CaptureConfiguration} with {@link saleae.TimedCaptureMode}.
+     * <p>
+     * When in timed capture mode, the capture will automatically stop after {@code durationSeconds}.
      */
     public static class CaptureConfigTimed extends CaptureConfig {
-
+        /**
+         * Seconds of data to capture.
+         */
         public double durationSeconds;
 
         @Override
@@ -212,24 +257,29 @@ public class Manager implements AutoCloseable {
     public static class CaptureConfigDigitalTrigger extends CaptureConfig {
 
         public DigitalTriggerType digitalTriggerType;
+        /**
+         * Number of seconds to continue capturing after trigger.
+         */
         public double afterTriggerSeconds;
         /**
-         * index of channel in which to search for the trigger
+         * Index of channel in which to search for the trigger.
          */
         public int triggerChannelIndex;
         /**
-         * Minimum pulse width to trigger on. Only applies when digitalTriggerType is a * pulse trigger type.
+         * Minimum pulse width to trigger on. Only applies when digitalTriggerType is a pulse trigger type.
          */
         public double minPulseWidthSeconds;
         /**
-         * Maximum pulse width to trigger on. Only applies when digitalTriggerType is a * pulse trigger type.
+         * Maximum pulse width to trigger on. Only applies when digitalTriggerType is a pulse trigger type.
          */
         public double maxPulseWidthSeconds;
 
         /**
-         * Conditions on other digital channels that must be met in order to meet the trigger condition. For an edge
-         * trigger, the linked channel must be in the specified state at when the trigger edge occurs. For a pulse
-         * trigger, the linked channel must be in the specified state for the duration of the pulse.
+         * Conditions on other digital channels that must be met in order to meet the trigger condition.
+         * <ul>
+         *     <li>For an edge trigger, the linked channel must be in the specified state at when the trigger edge occurs.</li>
+         *     <li>For a pulse trigger, the linked channel must be in the specified state for the duration of the pulse.</li>
+         * </ul>
          */
         public List<LinkedChannel> linkedChannels = Collections.emptyList();
 
@@ -237,7 +287,14 @@ public class Manager implements AutoCloseable {
          * Wrapper for {@link saleae.DigitalTriggerLinkedChannel}
          */
         public static class LinkedChannel {
+            /**
+             * Channel to link to.
+             */
             int channelIndex;
+
+            /**
+             * Expected state of the linked channel at trigger.
+             */
             DigitalTriggerLinkedChannelState state;
 
             DigitalTriggerLinkedChannel toGRPC() {
