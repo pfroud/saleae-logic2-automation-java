@@ -66,7 +66,7 @@ public class Manager implements AutoCloseable {
             }
             throw new IncompatibleApiVersionException(appApiVersion);
         }
-        System.out.printf("Connected to Logic version %s with PID %d.\n", appInfo.getApplicationVersion(), appInfo.getLaunchPid());
+        //System.out.printf("Connected to Logic version %s with PID %d.\n", appInfo.getApplicationVersion(), appInfo.getLaunchPid());
 
     }
 
