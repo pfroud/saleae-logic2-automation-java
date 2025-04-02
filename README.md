@@ -12,21 +12,21 @@ The gRPC API is specified using a Protocol Buffer langauge file ([saleae.proto](
 
 If you don't do anything special when cloning the repository then there will be an empty subdirectory called "logic2-automation". There are two ways to  get the submodule:
 
-1. When you clone the repository, add the [`--recurse-submodules`](https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--recurse-submodulescodecodecodeemltpathspecgtem) option: 
+1. When you clone the repository, add the [`--recurse-submodules`](https://git-scm.com/docs/git-clone#Documentation/git-clone.txt-code--recurse-submodulescodecodecodeemltpathspecgtem) option:
 
     ```commandline
     git clone --recurse-submodules https://github.com/pfroud/saleae-logic2-automation-java.git
     ```
 
-2.  Or, if you have already cloned the repository, run:
+2. Or, if you have already cloned the repository, run:
 
     ```commandline
     git submodule update --init
-    ``` 
+    ```
 
     [Link to documentation about the `git submodule update` command](https://git-scm.com/docs/git-submodule#Documentation/git-submodule.txt-update--init--remote-N--no-fetch--no-recommend-shallow-f--force--checkout--rebase--merge--referenceltrepositorygt--depthltdepthgt--recursive--jobsltngt--no-single-branch--filterltfilter-specgt--ltpathgt82308203)
 
-See https://git-scm.com/book/en/v2/Git-Tools-Submodules#_cloning_submodules.
+See <https://git-scm.com/book/en/v2/Git-Tools-Submodules#_cloning_submodules>.
 
 After running the Gradle build, a bunch of files will be created:
 
@@ -45,7 +45,7 @@ All the examples use a simulated device included in Logic 2, so a logic analyzer
 
 ## Java code style
 
-Java does not support keyword arguments aka named arguments, so we cannot do
+Java does not support keyword arguments aka named arguments, so we cannot exactly replicate [this example](https://saleae.github.io/logic2-automation/getting_started.html#using-the-python-automation-api) from the Python library:
 
 ```python
 my_device_config = automation.LogicDeviceConfiguration(
